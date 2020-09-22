@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Delicious</title>
+  <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
+  <script src="../scripts/vue.js"></script>
+  <style>
+    textarea {
+      resize: none;
+    }
+
+    .add-images {
+      height: 400px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .slider-wrap {
+      min-height: 400px;
+    }
+
+    .slides{
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .slides::-webkit-scrollbar {
+        display: none;
+    }
+
+    .image-display{
+      scroll-snap-align: start;
+      flex-shrink: 0;
+      width: 100%;
+      margin-right: 10px;
+      /* display: flex; */
+      transform-origin: center center;
+      transform: scale(1);
+      transition: transform 0.5s;
+      position: relative;
+    }
+    .image-display .image-box{
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      padding: 40px;
+    }
+    .image-display img{
+      max-height: 100%;
+    }
+    .image-dispay .image-actions {
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      height: 20px;
+      width: 20px;
+
+      background-color: black;
+    }
+
+    .image-display .image-actions .button {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+
+      height: 10px;
+      width: 10px;
+
+      background: black;
+    }
+  </style>
+</head>
+<body>
+<div id="bench" class="w-100 sans-serif mw6 pa3 center">
+    <div class="worksurface" v-if="!post.postUploaded">
+      <div class="slider-wrap mb2">
+        <div
+          v-if="post.selectedFiles.length == 0"
+          class="add-images w-100 v-mid flex items-center justify-center tc ba b--gray w-100"
+          @click="$refs.selectFiles.click()"
+          @touch="$refs.selectFiles.click()"
+        >+</div>
+        <div
+          v-else
+          class="w-100 tc overflow-hidden">
+            <div class="slides" @click="">
+              <image-display
+                v-for="(pic,index) in post.images"
+                :key="index"
+                :index="index"
+                :pic="pic"
+                ref="imgd"
+                :fields="['title', 'alt']"
+                :class="[isValidImage(pic) ? 'ba b--white' : 'ba b--red']"
+                @input="updateImage(index, $event)"
+              />
+            </div>
+        </div>
+      </div>
+      <form action="splash" method="POST" class="db w-100" ref="form">
+        <input
+          name="photos"
+          type="file" multiple="multiple"
+          @change="onFilesSelected"
+          class="dn"
+          ref="selectFiles"
+        >
+        <!-- <label for="title" class="label mb1 dib">Title</label> -->
+        <input type="text" name="title" class="w-100 mb3 bn br0" v-model="post.title"
+         placeholder="Title"
+        >
+        <!-- <label for="content" class="label mb1 dib">Content</label> -->
+        <textarea name="content" class="w-100 h3 mb3 bn br0" v-model="post.content"
+          placeholder="Content"
+        ></textarea>
+        <div
+          v-if="postIsValid"
+          class="w-100 ba tc v-mid red"
+          @click="uploadForm"
+        >
+          <p>upload</p>
+        </div>
+        <div
+          v-else
+          class="w-100 ba tc v-mid"
+        >
+          <p>
+            Fill out every field for every photo before uploading
+          </p>
+        </div>
+      </form>
+    </div>
+    <div class="message flex pa5" v-else>
+      <p>you did it</p>
+    </div>
+  </div>
+  <script type="text/x-template" id="image-display">
+    <div class="image-display ba">
+      <div class="image-box pa3" @click="toggleImageFields">
+        <img :src="pic.src" :alt="pic.alt" :title="pic.title">
+      </div>
+      <ul
+        class="img-fields ph3 tl ttc list"
+        v-show="showFields"
+      >
+        <li v-for="(field, i) in fields">
+          <label :for="'image-'+field+'-'+index"
+            class="label tl dib mb1"
+          >{{field}}</label>
+          <input
+          class="w-100 mb3"
+          :name="'image-'+field+'-'+index"
+          type="text"
+          @input="input(field, $event.target.value)"
+          >
+        </li>
+      </ul>
+    </div>
+  </script>
+</body>
+<script>
+  new Vue({
+    el: "#bench",
+    data: {
+      post: {
+        selectedFiles: [],
+        images: [],
+        title: "",
+        content: "",
+        date: new Date().toISOString().replace(/T.*/,''),
+        postUploaded: false,
+        isValid: false
+      },
+      view: {
+        imageSlider: true
+      },
+      isMounted: false,
+    },
+    computed: {
+      inputsAreValid: function(){
+        let inputs = [
+          this.post.title,
+          this.post.content,
+          this.post.selectedFiles
+        ]
+        return inputs.every(ii => {
+          return ii.length > 0
+        })
+      },
+      imagesAreValid: function(){
+        return this.post.images.every(img => {
+          return img.alt.length > 0 && img.title.length > 0
+        })
+      },
+      postIsValid: function(){
+        return this.post.isValid = this.inputsAreValid && this.imagesAreValid
+      }
+    },
+    methods: {
+      isValidImage: function(p){
+        return p.alt.length > 0 && p.title.length > 0
+      },
+      onFilesSelected: function(data){
+        this.view.imageSlider = true
+        this.post.selectedFiles = data.target.files
+        for(var i = 0; i < data.target.files.length; i++){
+          const reader = new FileReader()
+          reader.addEventListener('load', event => {
+             let img = new Image()
+             img.src = event.target.result
+             img.alt = ""
+             img.title = ""
+             this.post.images.push(img)
+          });
+          var ff = data.target.files[i]
+          reader.readAsDataURL(ff)
+        }
+      },
+      updateImage: function(i, e){
+        let newimage = this.post.images[i]
+        newimage[e.name] = e.contents
+        this.$set(this.post.images, i, newimage)
+      },
+      uploadForm: function(data){
+        if(this.debug) {
+          this.post.postUploaded = true
+          return
+        }
+        const formData = new FormData()
+        Array.from(this.post.selectedFiles).forEach((item, i) => {
+          formData.append('photos', item)
+        });
+        formData.append('title', this.post.title)
+        formData.append('content', this.post.content)
+        formData.append('date', this.post.date)
+        for(let i = 0; i < this.post.images.length; i++){
+          formData.append('photoData', JSON.stringify({title: this.post.images[i].title, alt: this.post.images[i].alt}))
+        }
+        fetch('/splash', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => response.json())
+        .then(result => {
+          console.log('Success:', result);
+          this.post.postUploaded = true
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
+      },
+      clickInterior: function(e){
+        this.$refs.imgd.forEach((item, i) => {
+          item.toggleImageFields()
+        });
+      }
+    },
+    mounted: function(){
+      this.isMounted = true
+    },
+  });
+  Vue.component('image-display', {
+    props: ['pic', 'index', 'fields'],
+    template: "#image-display",
+    data: function(){
+      return {
+        showFields: false
+      }
+    },
+    methods: {
+      toggleImageFields: function(){
+        this.showFields = !this.showFields
+      },
+      input: function(f,e){
+        this.$emit('input', {name:f, contents:e})
+      }
+    }
+  })
+</script>
+</html>

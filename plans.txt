@@ -1,0 +1,9 @@
+Local build
+All normal
+
+deploy script
+copy files and index.js to provided directory with provided folder name
+ // yesthisislouis
+ // gram
+
+git add && git push
